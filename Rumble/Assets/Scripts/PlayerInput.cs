@@ -48,12 +48,26 @@ public class PlayerInput : MonoBehaviour
             if (CheckJump())
                 Jump();
 
+        if (!GetComponent<PlayerStats>().currentWeapon.isReloading)
+        {
+            //Under test
+            if (Input.GetButtonDown(joystickName + "YButton"))
+                controller.SwapWeapons();
+        }
+
+        //Under test
+        if (Input.GetButtonDown(joystickName + "BButton"))
+            controller.PickUpWeapon();
+
         float targetZVelocity = Input.GetAxisRaw(joystickName + "LeftHoriz") * moveSpeed;
 
         if (controller.collisions.below)
             velocity.z = Mathf.SmoothDamp(velocity.z, targetZVelocity, ref velocityZSmoothing, accelerationTimeGround);
         else
             velocity.z = Mathf.SmoothDamp(velocity.z, targetZVelocity, ref velocityZSmoothing, accelerationTimeAir);
+
+        //Under test
+        controller.Aim(Input.GetAxis(joystickName + "RightHoriz"), Input.GetAxis(joystickName + "RightVert"));
     }
 
     private void FixedUpdate ()

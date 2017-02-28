@@ -8,11 +8,14 @@ public class PlayerController : MonoBehaviour
     public int horizRayCount;
     public int vertRayCount;
     public CollisionInfo collisions;
+    public GameObject availableWeapon = null;
+    public bool weaponAvailable = false;
     #endregion
 
     #region Private
     private CapsuleCollider playerCollider;
     private RaycastOrigins raycastOrigins;
+    private PlayerStats playerStat;
     private const float SKIN_WIDTH = 0.015f;
     private float horizRaySpacing;
     private float vertRaySpacing;
@@ -27,6 +30,7 @@ public class PlayerController : MonoBehaviour
     private void Start()
     {
         playerCollider = GetComponent<CapsuleCollider>();
+        playerStat = GetComponent<PlayerStats>();
         CalculateRaySpacing();
 
         collisionMask = 1 << GROUND_LAYER;
@@ -44,6 +48,76 @@ public class PlayerController : MonoBehaviour
             VerticalCollisions(ref velocity);
         
         transform.Translate(velocity);
+    }
+
+    public float XInput;
+    public float YInput;
+
+    //Under test
+    public void Aim(float xInput, float yInput)
+    {
+        XInput = xInput;
+        YInput = yInput;
+        if (xInput < 0.15f && xInput > -0.15f)
+        {
+            if (yInput < 0)
+                gameObject.transform.GetChild(0).transform.eulerAngles = new Vector3(270, 0, 0);
+            else if (yInput > 0)
+                gameObject.transform.GetChild(0).transform.eulerAngles = new Vector3(90, 0, 0);
+        }
+        else if (xInput < 0)
+        {
+            if (yInput < 0.15f && yInput > -0.15f)
+                gameObject.transform.GetChild(0).transform.eulerAngles = new Vector3(180, 0, 0);
+            else if (yInput < 0)
+                gameObject.transform.GetChild(0).transform.eulerAngles = new Vector3(225, 0, 0);
+            else if (yInput > 0)
+                gameObject.transform.GetChild(0).transform.eulerAngles = new Vector3(135, 0, 0);
+        }
+        else if (xInput > 0)
+        {
+            if (yInput < 0.15f && yInput > -0.15f)
+                gameObject.transform.GetChild(0).transform.eulerAngles = new Vector3(0, 0, 0);
+            else if (yInput < 0)
+                gameObject.transform.GetChild(0).transform.eulerAngles = new Vector3(315, 0, 0);
+            else if (yInput > 0)
+                gameObject.transform.GetChild(0).transform.eulerAngles = new Vector3(45, 0, 0);
+        }
+    }
+
+    //Under test
+    public void SwapWeapons()
+    {
+        if (playerStat.numWeapons > 1)
+        {
+            Weapon tempWeapon = playerStat.currentWeapon;
+            playerStat.currentWeapon = playerStat.secondaryWeapon;
+            playerStat.secondaryWeapon = tempWeapon;
+            playerStat.currentWeapon.gameObject.transform.parent.gameObject.SetActive(true);
+            playerStat.secondaryWeapon.gameObject.transform.parent.gameObject.SetActive(false);
+        }
+    }
+
+    //Under test
+    public void PickUpWeapon()
+    {
+        if (weaponAvailable)
+        {
+            Weapon droppedWeapon = playerStat.currentWeapon;
+            Weapon newWeapon = availableWeapon.transform.GetChild(0).gameObject.GetComponent<Weapon>();
+
+            newWeapon.isPickedUp = true;
+            newWeapon.controllerName = playerStat.GetControllerName();
+            newWeapon.collisionMask = (1 << playerStat.teamMask) | collisionMask;
+            newWeapon.gameObject.transform.parent.parent = gameObject.transform.GetChild(0);
+            newWeapon.gameObject.transform.parent.transform.localPosition = new Vector3(0, 0, 1);
+            droppedWeapon.isPickedUp = false;
+            droppedWeapon.controllerName = "";
+            droppedWeapon.collisionMask = 1 << 0;
+            droppedWeapon.gameObject.transform.parent.parent = null;
+
+            playerStat.currentWeapon = newWeapon;
+        }
     }
 
     private void HorizontalCollisions(ref Vector3 velocity)

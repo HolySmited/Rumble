@@ -18,11 +18,14 @@ abstract public class Weapon : MonoBehaviour
     public int ammoInClip;
     public int ammoReserve;
     public int maxTotalAmmo;
+    public bool isPickedUp;
+    //The string name of the player's controller
+    public string controllerName;
+    public int collisionMask;
+    public bool isReloading;
     #endregion
 
     #region Private
-    //The string name of the player's controller
-    protected string controllerName;
     //The ray that tests for a hit when shooting
     protected Ray shootRay;
     //The hit info from shootRay
@@ -32,14 +35,10 @@ abstract public class Weapon : MonoBehaviour
     protected LineRenderer gunLine;
     protected AudioSource gunAudio;
     protected Light gunLight;
-    protected Text ammoText; //Testing purposes only
-    //Indicates anything that is shootable (enemies, walls, ground, etc.)
-    public const int PLAYER_LAYER = 9;
     public const int GROUND_LAYER = 8;
     //Layers that bullets cannot penetrate
-    protected int playerMask;
     protected int groundMask;
-    protected int collisionMask;
+    protected PlayerStats playerScript;
     #endregion
 
     #region Serialized
@@ -51,61 +50,88 @@ abstract public class Weapon : MonoBehaviour
     [SerializeField] protected float reloadTime;
     [SerializeField] protected float timeSinceLastFire;
     [SerializeField] protected float vfxTimer;
-    [SerializeField] protected bool isReloading;
-    [SerializeField] protected bool isPickedUp;
     #endregion
 
     protected void Awake()
     {
         //Get a reference to all necessary components
         gunParticles = GetComponent<ParticleSystem>();
-        gunLine = GetComponent<LineRenderer>();
         gunAudio = GetComponent<AudioSource>();
         gunLight = GetComponent<Light>();
-        ammoText = GameObject.Find("Ammo Counter").GetComponent<Text>(); //Testing purposes only
-        playerMask = 1 << PLAYER_LAYER;
         groundMask = 1 << GROUND_LAYER;
-        collisionMask = playerMask | groundMask;
+    }
+
+    protected virtual void Start()
+    {
 
     }
 
-    protected void Update()
+    protected virtual void Update()
     {
-        //Increase the time since the last firing of the gun
-        timeSinceLastFire += Time.deltaTime;
 
-        //If the player holds down right trigger
-        if (Input.GetAxisRaw(controllerName + "RT") > 0.5)
+    }
+
+    protected void OnTriggerEnter(Collider other)
+    {
+        if (!isPickedUp)
         {
-            //If the player  is not reloading and is ready to fire again
-            if (!isReloading && timeSinceLastFire >= fireRate)
+            if (other.tag == "Player")
             {
-                //If the player has ammo in the clip, fire
-                if (ammoInClip > 0)
-                    Shoot();
-                //If the player has no ammo in the clip, reset the timeSinceLastFire and play an empty clip sound
+                playerScript = other.gameObject.GetComponent<PlayerStats>();
+
+                if (playerScript.numWeapons == 0)
+                {
+                    playerScript.currentWeapon = this;
+                    collisionMask = (1 << playerScript.teamMask) | groundMask;
+                    controllerName = playerScript.GetControllerName();
+                    isPickedUp = true;
+                    gameObject.transform.parent.parent = other.gameObject.transform.GetChild(0);
+                }
+                else if (playerScript.numWeapons == 1)
+                {
+                    if (playerScript.currentWeapon.GetType() != this.GetType())
+                    {
+                        playerScript.secondaryWeapon = this;
+                        collisionMask = (1 << playerScript.teamMask) | groundMask;
+                        controllerName = playerScript.GetControllerName();
+                        isPickedUp = true;
+                        gameObject.transform.parent.transform.parent = other.gameObject.transform.GetChild(0);
+                        gameObject.transform.parent.localPosition = new Vector3(0, 0, 1);
+                        gameObject.transform.parent.gameObject.SetActive(false);
+                        playerScript.numWeapons++;
+                    }
+                }
                 else
                 {
-                    timeSinceLastFire = 0f;
-                    gunAudio.clip = emptyShot;
-                    gunAudio.Play();
+                    if (playerScript.currentWeapon.GetType() != this.GetType() && playerScript.secondaryWeapon.GetType() != this.GetType())
+                    {
+                        PlayerController playerCont = other.gameObject.GetComponent<PlayerController>();
+
+                        playerCont.weaponAvailable = true;
+                        playerCont.availableWeapon = gameObject.transform.parent.gameObject;
+                    }
                 }
             }
         }
+    }
 
-        //If the player presses the X button
-        if (Input.GetButtonDown(controllerName + "XButton"))
+    protected void OnTriggerExit(Collider other)
+    {
+        if (!isPickedUp)
         {
-            //If they are missing ammo in their clip and have ammo left
-            if (ammoInClip != clipSize && ammoReserve != 0)
-                StartCoroutine("Reload");
+            if (other.tag == "Player")
+            {
+                playerScript = other.gameObject.GetComponent<PlayerStats>();
+
+                if (playerScript.currentWeapon.GetType() != this.GetType() && playerScript.secondaryWeapon.GetType() != this.GetType())
+                {
+                    PlayerController playerCont = other.gameObject.GetComponent<PlayerController>();
+
+                    playerCont.weaponAvailable = false;
+                    playerCont.availableWeapon = gameObject;
+                }
+            }
         }
-
-        //If the time since last firing the gun is greater than the lifetime of the VFX
-        if (timeSinceLastFire >= fireRate * vfxTimer)
-            DisableEffects();
-
-        ammoText.text = "Ammo: " + ammoInClip + "/" + clipSize + "\nReserve: " + ammoReserve; //Testing purposes only
     }
 
     public void AddAmmo(int amount)
@@ -116,46 +142,9 @@ abstract public class Weapon : MonoBehaviour
             ammoReserve = maxTotalAmmo - ammoInClip;
     }
 
-    //Fires the weapon and creates visual and audio effects
-    protected void Shoot()
+    protected virtual void Shoot()
     {
-        //Reset the time since last firing the weapon
-        timeSinceLastFire = 0f;
-        //Reduce the ammo in the clip
-        ammoInClip--;
-        //Start the effects for firing the weapon
-        gunAudio.clip = gunshot;
-        gunAudio.Play();
-        gunLight.enabled = true;
-        //If the particles are still playing, stop the old particles and start new ones
-        gunParticles.Stop();
-        gunParticles.Play();
-        gunLine.enabled = true;
-        //Set the start position of the line renderer to the muzzle
-        gunLine.SetPosition(0, transform.position);
-        //Create the shootRay data
-        shootRay.origin = transform.position;
-        shootRay.direction = transform.forward;
 
-        //If the shootRay hits something within range of the weapon on the shootable layer
-        if (Physics.Raycast(shootRay, out shootHit, range, collisionMask))
-        {
-            //Set the end position of the line renderer to whatever was hit
-            gunLine.SetPosition(1, shootHit.point);
-            //Find the object that was hit
-            GameObject objectHit = shootHit.collider.gameObject;
-            //If it was an enemy
-            if (objectHit.tag == "Enemy") //Will change after testing
-            {
-                //Tell the enemy to take damage
-                EnemyTest script = objectHit.GetComponent<EnemyTest>(); //Will change after testing
-                script.TakeDamage(damage); //Will change after testing
-            }
-        }
-        //If the shootRay did not hit anything within range
-        else
-            //Set the end position of the line renderer to the maximum range of the weapon
-            gunLine.SetPosition(1, shootRay.origin + shootRay.direction * range);
     }
 
     //A coroutine that reloads the weapon
@@ -207,9 +196,8 @@ abstract public class Weapon : MonoBehaviour
     }
 
     //Disables persistent effects from firing the weapon
-    protected void DisableEffects()
+    protected virtual void DisableEffects()
     {
-        gunLine.enabled = false;
-        gunLight.enabled = false;
+
     }
 }

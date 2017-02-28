@@ -92,7 +92,7 @@ public class Shotgun : Weapon
         for (int i = 0; i < numPellets; i++)
         {
             lines[i].transform.position = transform.position;
-            lines[i].transform.eulerAngles = new Vector3(Random.Range(-fireAngleDegrees, fireAngleDegrees), 0, 0);
+            lines[i].transform.eulerAngles = new Vector3(transform.rotation.eulerAngles.x + Random.Range(-fireAngleDegrees, fireAngleDegrees), transform.rotation.eulerAngles.y, transform.rotation.eulerAngles.z);
             lines[i].SetActive(true);
             lines[i].GetComponent<LineRenderer>().enabled = true;
             lines[i].GetComponent<ShotgunLine>().OnActive(fireRate * vfxTimer, shootRay, shootHit, range, collisionMask, damage);

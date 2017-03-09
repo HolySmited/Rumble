@@ -1,5 +1,4 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -17,7 +16,7 @@ public abstract class Gun : MonoBehaviour
     public AudioClip gunshot;
     public AudioClip reload;
     public AudioClip outOfAmmo;
-    protected float vfxLifetime;
+    public float vfxLifetime;
 
     //Effect systems
     protected ParticleSystem shootParticles;
@@ -25,40 +24,35 @@ public abstract class Gun : MonoBehaviour
     protected Light gunLight;
 
     //Collision information
-    protected LayerMask collisionLayer;
+    public LayerMask ignoreBulletsLayer;
+    protected LayerMask collisionMask;
 
     //Gun stats
     public int ammoInClip;
     public int ammoInReserve;
     public bool isReloading;
-    protected int clipSize;
-    protected int reserveSize;
-    protected int damage;
-    protected float range;
-    protected float fireRate;
-    protected float reloadTime;
+    public int clipSize;
+    public int reserveSize;
+    public int damage;
+    public float fireRate;
+    public float reloadTime;
     protected float timeSinceLastFire;
-    protected float effectLifeTime;
 
+    //Fires the weapon
+    public abstract void Shoot(PlayerStats firingPlayer);
+
+    //Gets references to the effect systems
     protected virtual void Awake()
     {
-        //Get references to the effect systems
         shootParticles = GetComponent<ParticleSystem>();
         gunAudio = GetComponent<AudioSource>();
         gunLight = GetComponent<Light>();
-    }
-
-    //Fires the weapon
-    protected virtual void Shoot()
-    {
-        return;
     }
 
     //Disables VFX created by the gun
     protected virtual void DisableEffects()
     {
         gunLight.enabled = false;
-        shootParticles.Stop();
         return;
     }
 
@@ -73,6 +67,13 @@ public abstract class Gun : MonoBehaviour
             ammoInReserve = reserveSize;
     }
 
+    //Used for starting the reload coroutine
+    public void ReloadCurrentWeapon()
+    {
+        StartCoroutine("Reload");
+    }
+
+    //Handles timers for shooting and VFX
     protected void Update()
     {
         //Increase the time since the last firing of the gun
@@ -116,8 +117,7 @@ public abstract class Gun : MonoBehaviour
             yield break;
 
         //Play reload sound
-        gunAudio.clip = reload;
-        gunAudio.Play();
+        gunAudio.PlayOneShot(reload);
 
         //Set reloading to true so the player cannot fire while reloading
         isReloading = true;
@@ -154,6 +154,8 @@ public abstract class Gun : MonoBehaviour
                     ammoInClip += ammoInReserve;
                     ammoInReserve = 0;
                 }
+
+                isReloading = false;
             }
         }
     }

@@ -91,7 +91,7 @@ public class PlayerEquipment : MonoBehaviour
                     guns[currentWeaponIndex] = newWeapon;
                     //Move the new weapon and child it to the player's aim pivot
                     newWeapon.transform.parent.SetParent(gameObject.transform.GetChild(0));
-                    newWeapon.transform.parent.transform.localPosition = new Vector3(0, 0, 1);
+                    newWeapon.transform.parent.transform.localPosition = new Vector3(0, 0, 0.5f);
                     //Remove the new weapon from the list of weapons in range
                     RemoveWeaponInRange(newWeapon);
 
